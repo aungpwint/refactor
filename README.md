@@ -5,6 +5,12 @@ refactoring, renaming, validating, and migrating** large software codebases.
 It targets the TBD monorepo (Laravel + React/TypeScript) but works on any
 repository.
 
+> **New to refactor?** Read the documentation:
+>
+> - [User Guide](doc/guide.md) — how it works, safety features, configuration
+> - [Command Reference](doc/commands.md) — every command, every flag, with output examples
+> - [Real-World Examples](doc/examples.md) — step-by-step workflows for common tasks
+
 ## Features
 
 - **scan** — File and directory inventory broken down by extension.
