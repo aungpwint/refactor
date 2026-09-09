@@ -183,23 +183,43 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist/release
-          find dist/binaries -type f -not -name '*.yml' -not -name '*.yaml' | while read -r f; do
-            cp "$f" dist/release/
+
+          # download-artifact@v4 puts each artifact in a subdirectory named after it
+          for artifact_dir in dist/binaries/*/; do
+            if [ -d "$artifact_dir" ]; then
+              for f in "$artifact_dir"*; do
+                if [ -f "$f" ]; then
+                  cp "$f" dist/release/
+                fi
+              done
+            fi
           done
+
           echo "=== Staged artifacts ==="
           ls -la dist/release/
+          echo "File count: $(ls -1 dist/release/ | wc -l)"
 
       - name: Generate SHA256 checksums
         shell: bash
         run: |
           set -euo pipefail
           cd dist/release
-          touch checksums.txt
+
+          # Find all refactor binaries and generate checksums
+          > checksums.txt
           for f in refactor-*; do
             if [ -f "$f" ]; then
               sha256sum "$f" >> checksums.txt
             fi
           done
+
+          if [ ! -s checksums.txt ]; then
+            echo "::error::No refactor binaries found to generate checksums" >&2
+            echo "Contents of dist/release:" >&2
+            ls -la dist/release/ >&2
+            exit 1
+          fi
+
           echo "=== checksums.txt ==="
           cat checksums.txt
 
