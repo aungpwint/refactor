@@ -4,7 +4,33 @@ How to install Refactor on any device. No programming knowledge required.
 
 ---
 
-## Option 1: Download a pre-built binary (easiest)
+## Option 1: One-command install (macOS / Linux)
+
+Run this single command in your terminal:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/aungpwint/refactor/main/install.sh | bash
+```
+
+This automatically:
+- Detects your platform (macOS/Linux, Intel/ARM)
+- Downloads the correct binary from the latest release
+- Verifies the SHA256 checksum
+- Installs to `/usr/local/bin/refactor`
+
+To install a specific version:
+```bash
+curl -fsSL https://raw.githubusercontent.com/aungpwint/refactor/main/install.sh | bash -s -- --version v1.0.0
+```
+
+To install to a custom location:
+```bash
+curl -fsSL https://raw.githubusercontent.com/aungpwint/refactor/main/install.sh | bash -s -- --to ~/bin
+```
+
+---
+
+## Option 2: Download from GitHub Releases
 
 Go to the [Releases page](https://github.com/aungpwint/refactor/releases)
 and download the file for your system:
@@ -28,11 +54,9 @@ and download the file for your system:
 refactor --version
 ```
 
-### macOS
+### macOS (manual)
 
-Open Terminal and run one of these commands:
-
-**Intel Mac:**
+**Intel:**
 ```bash
 curl -L https://github.com/aungpwint/refactor/releases/latest/download/refactor-macos-x64 -o /usr/local/bin/refactor
 chmod +x /usr/local/bin/refactor
@@ -44,14 +68,7 @@ curl -L https://github.com/aungpwint/refactor/releases/latest/download/refactor-
 chmod +x /usr/local/bin/refactor
 ```
 
-Then verify:
-```bash
-refactor --version
-```
-
-### Linux
-
-Open a terminal and run one of these commands:
+### Linux (manual)
 
 **x64:**
 ```bash
@@ -65,14 +82,9 @@ curl -L https://github.com/aungpwint/refactor/releases/latest/download/refactor-
 chmod +x /usr/local/bin/refactor
 ```
 
-Then verify:
-```bash
-refactor --version
-```
-
 ---
 
-## Option 2: Install from source (for developers)
+## Option 3: Install from source (for developers)
 
 You need [Rust](https://rustup.rs/) installed (version 1.75 or later).
 
@@ -92,8 +104,8 @@ If you already have Refactor installed, update it with one command:
 refactor update
 ```
 
-This checks GitHub for the latest version, downloads it, and replaces your
-current installation automatically.
+This checks GitHub for the latest version, downloads it, verifies the
+checksum, and replaces your current installation automatically.
 
 ---
 
@@ -108,9 +120,9 @@ refactor --version
 
 ## Uninstall
 
-**If installed via binary download:**
-- Windows: delete `refactor.exe` from wherever you placed it
+**If installed via install.sh or binary download:**
 - macOS/Linux: `sudo rm /usr/local/bin/refactor`
+- Windows: delete `refactor.exe` from wherever you placed it
 
 **If installed from source:**
 ```bash

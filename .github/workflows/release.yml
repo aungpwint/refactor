@@ -1,20 +1,88 @@
 name: Release
 
+# Builds the CLI on every supported platform, validates the version,
+# generates SHA256 checksums, generates release notes, creates a draft
+# GitHub Release, validates it, and only then publishes it.
+#
+# Trigger: push a version tag, e.g.  v1.0.0
+#
+#   git tag v1.0.0
+#   git push origin v1.0.0
+#
+# Or use the release script:
+#   ./scripts/release.sh --next 1.0.0 --push
+#
+# Or run manually (Actions tab -> "Release" -> Run workflow):
+#   version:  the version to release as MAJOR.MINOR.PATCH (no leading "v").
+#   draft:    start as "true" (recommended) to leave the release unpublished
+#             for inspection; set to "false" to publish automatically.
+
 on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: >-
+          Version to release as MAJOR.MINOR.PATCH (no leading "v"), e.g. 1.0.0.
+          Must match the version in Cargo.toml, or the run fails before building.
+        required: true
+      draft:
+        description: >-
+          Keep the GitHub Release as an unpublished draft after the build and
+          stop. Set to "false" to publish it automatically once all validation
+          passes.
+        type: boolean
+        default: true
 
 permissions:
   contents: write
 
 env:
   CARGO_TERM_COLOR: always
+  GITHUB_OWNER: ${{ github.repository_owner }}
+  GITHUB_REPO: ${{ github.event.repository.name }}
+  RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_name || format('v{0}', inputs.version) }}
 
 jobs:
+  # ---------------------------------------------------------------------------
+  # Version validation — fail fast if the release version does not match the
+  # version in Cargo.toml or if the tag format is invalid.
+  # ---------------------------------------------------------------------------
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate manual release version format
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          set -euo pipefail
+          VERSION="${{ inputs.version }}"
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Invalid version input '$VERSION'. Use MAJOR.MINOR.PATCH (e.g. 1.0.0)." >&2
+            exit 1
+          fi
+          echo "Manual release version input OK: $VERSION"
+
+      - name: Validate version matches Cargo.toml
+        run: |
+          set -euo pipefail
+          TAG="${{ env.RELEASE_TAG }}"
+          VERSION="${TAG#v}"
+          CARGO_VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          if [ "$VERSION" != "$CARGO_VERSION" ]; then
+            echo "::error::Tag version ($VERSION) does not match Cargo.toml version ($CARGO_VERSION)" >&2
+            exit 1
+          fi
+          echo "Version validation passed: $VERSION"
+
+  # ---------------------------------------------------------------------------
+  # Build + test on every platform.
+  # ---------------------------------------------------------------------------
   build:
-    name: Build ${{ matrix.target }}
-    runs-on: ${{ matrix.os }}
+    needs: validate
     strategy:
       fail-fast: false
       matrix:
@@ -22,23 +90,25 @@ jobs:
           - target: x86_64-pc-windows-msvc
             os: windows-latest
             artifact: refactor-windows-x64.exe
-            rename: refactor.exe
+            ext: .exe
           - target: x86_64-apple-darwin
             os: macos-latest
             artifact: refactor-macos-x64
-            rename: refactor
+            ext: ""
           - target: aarch64-apple-darwin
             os: macos-latest
             artifact: refactor-macos-arm64
-            rename: refactor
+            ext: ""
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
             artifact: refactor-linux-x64
-            rename: refactor
+            ext: ""
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-latest
             artifact: refactor-linux-arm64
-            rename: refactor
+            ext: ""
+
+    runs-on: ${{ matrix.os }}
 
     steps:
       - uses: actions/checkout@v4
@@ -47,6 +117,19 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
+          components: rustfmt, clippy
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+
+      - name: Format check
+        run: cargo fmt --check
+
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Tests
+        run: cargo test
 
       - name: Install cross-compilation tools (Linux ARM64)
         if: matrix.target == 'aarch64-unknown-linux-gnu'
@@ -60,14 +143,15 @@ jobs:
 
       - name: Rename binary (Windows)
         if: matrix.os == 'windows-latest'
+        shell: pwsh
         run: |
-          copy target/${{ matrix.target }}/release/refactor.exe ${{ matrix.artifact }}
+          Copy-Item "target/${{ matrix.target }}/release/refactor.exe" "${{ matrix.artifact }}"
 
       - name: Rename binary (Unix)
         if: matrix.os != 'windows-latest'
         run: |
-          cp target/${{ matrix.target }}/release/refactor ${{ matrix.artifact }}
-          chmod +x ${{ matrix.artifact }}
+          cp "target/${{ matrix.target }}/release/refactor" "${{ matrix.artifact }}"
+          chmod +x "${{ matrix.artifact }}"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -75,72 +159,184 @@ jobs:
           name: ${{ matrix.artifact }}
           path: ${{ matrix.artifact }}
 
-  release:
-    name: Create Release
+  # ---------------------------------------------------------------------------
+  # Publish — download all platform binaries, generate checksums, release
+  # notes, create draft release, validate, then publish.
+  # ---------------------------------------------------------------------------
+  publish:
+    name: Publish GitHub Release
     needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
 
-      - name: Download all artifacts
+      - name: Download all platform artifacts
         uses: actions/download-artifact@v4
+        with:
+          path: dist/binaries
 
-      - name: Create checksums
+      - name: Gather binaries into staging dir
+        shell: bash
         run: |
-          for dir in refactor-*/; do
-            if [ -d "$dir" ]; then
-              cd "$dir"
-              for f in *; do
-                sha256sum "$f" >> ../checksums.txt
-              done
-              cd ..
+          set -euo pipefail
+          mkdir -p dist/release
+          for dir in dist/binaries/refactor-*/; do
+            for f in "$dir"*; do
+              [ -f "$f" ] && cp "$f" dist/release/
+            done
+          done
+          echo "=== Staged artifacts ==="
+          ls -la dist/release/
+
+      - name: Generate SHA256 checksums
+        run: |
+          set -euo pipefail
+          cd dist/release
+          for f in *; do
+            [ -f "$f" ] && sha256sum "$f" >> checksums.txt
+          done
+          echo "=== checksums.txt ==="
+          cat checksums.txt
+
+      - name: Validate release artifacts
+        run: |
+          set -euo pipefail
+          VERSION="${{ env.RELEASE_TAG }}"
+          VERSION="${VERSION#v}"
+          cd dist/release
+
+          # Check at least one binary exists
+          BINARY_COUNT=$(ls -1 refactor-* 2>/dev/null | wc -l)
+          if [ "$BINARY_COUNT" -lt 1 ]; then
+            echo "::error::No binary artifacts found" >&2
+            exit 1
+          fi
+          echo "Found $BINARY_COUNT binary artifacts"
+
+          # Check no zero-byte files
+          for f in refactor-*; do
+            if [ ! -s "$f" ]; then
+              echo "::error::Artifact $f is zero bytes" >&2
+              exit 1
             fi
           done
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          generate_release_notes: true
-          files: |
-            refactor-windows-x64/refactor-windows-x64.exe
-            refactor-macos-x64/refactor-macos-x64
-            refactor-macos-arm64/refactor-macos-arm64
-            refactor-linux-x64/refactor-linux-x64
-            refactor-linux-arm64/refactor-linux-arm64
-            checksums.txt
-          body: |
-            ## Install
+          # Check checksums.txt exists and is non-empty
+          if [ ! -s checksums.txt ]; then
+            echo "::error::checksums.txt is missing or empty" >&2
+            exit 1
+          fi
 
-            ### Windows
-            Download `refactor-windows-x64.exe` and rename to `refactor.exe`.
-            Add to a folder in your PATH.
+          # Verify all checksums
+          sha256sum -c checksums.txt
+          echo "All checksums verified"
 
-            ### macOS (Intel)
-            ```bash
-            curl -L https://github.com/aungpwint/refactor/releases/latest/download/refactor-macos-x64 -o /usr/local/bin/refactor
-            chmod +x /usr/local/bin/refactor
-            ```
+      - name: Generate release notes
+        run: |
+          set -euo pipefail
+          TAG="${{ env.RELEASE_TAG }}"
+          VERSION="${TAG#v}"
+          BASE_URL="https://github.com/${{ env.GITHUB_OWNER }}/${{ env.GITHUB_REPO }}/releases/download/$TAG"
 
-            ### macOS (Apple Silicon)
-            ```bash
-            curl -L https://github.com/aungpwint/refactor/releases/latest/download/refactor-macos-arm64 -o /usr/local/bin/refactor
-            chmod +x /usr/local/bin/refactor
-            ```
+          cat > dist/release-notes.md << 'HEADER'
+          # Refactor
 
-            ### Linux (x64)
-            ```bash
-            curl -L https://github.com/aungpwint/refactor/releases/latest/download/refactor-linux-x64 -o /usr/local/bin/refactor
-            chmod +x /usr/local/bin/refactor
-            ```
+          HEADER
 
-            ### Linux (ARM64)
-            ```bash
-            curl -L https://github.com/aungpwint/refactor/releases/latest/download/refactor-linux-arm64 -o /usr/local/bin/refactor
-            chmod +x /usr/local/bin/refactor
-            ```
+          # Git log since last tag
+          PREV_TAG=$(git tag --sort=-version:refname | grep '^v' | head -2 | tail -1 || echo "")
+          if [ -n "$PREV_TAG" ]; then
+            echo "## Changes since $PREV_TAG" >> dist/release-notes.md
+            echo "" >> dist/release-notes.md
+            git log --oneline "$PREV_TAG..$TAG" >> dist/release-notes.md
+          else
+            echo "## Changes" >> dist/release-notes.md
+            echo "" >> dist/release-notes.md
+            git log --oneline >> dist/release-notes.md
+          fi
 
-            ### Auto-update
-            If you already have refactor installed, run:
-            ```bash
-            refactor update
-            ```
+          echo "" >> dist/release-notes.md
+          echo "## Downloads" >> dist/release-notes.md
+          echo "" >> dist/release-notes.md
+          echo "| Platform | File |" >> dist/release-notes.md
+          echo "|----------|------|" >> dist/release-notes.md
+          echo "| Windows (x64) | [refactor-windows-x64.exe]($BASE_URL/refactor-windows-x64.exe) |" >> dist/release-notes.md
+          echo "| macOS (Intel) | [refactor-macos-x64]($BASE_URL/refactor-macos-x64) |" >> dist/release-notes.md
+          echo "| macOS (Apple Silicon) | [refactor-macos-arm64]($BASE_URL/refactor-macos-arm64) |" >> dist/release-notes.md
+          echo "| Linux (x64) | [refactor-linux-x64]($BASE_URL/refactor-linux-x64) |" >> dist/release-notes.md
+          echo "| Linux (ARM64) | [refactor-linux-arm64]($BASE_URL/refactor-linux-arm64) |" >> dist/release-notes.md
+
+          echo "" >> dist/release-notes.md
+          echo "## Installation" >> dist/release-notes.md
+          echo "" >> dist/release-notes.md
+          echo "### Quick install (macOS/Linux)" >> dist/release-notes.md
+          echo '```bash' >> dist/release-notes.md
+          echo "# Detect your platform and install automatically" >> dist/release-notes.md
+          echo "curl -fsSL https://raw.githubusercontent.com/${{ env.GITHUB_OWNER }}/${{ env.GITHUB_REPO }}/main/install.sh | bash" >> dist/release-notes.md
+          echo '```' >> dist/release-notes.md
+          echo "" >> dist/release-notes.md
+          echo "### Auto-update" >> dist/release-notes.md
+          echo '```bash' >> dist/release-notes.md
+          echo "refactor update" >> dist/release-notes.md
+          echo '```' >> dist/release-notes.md
+
+          echo "" >> dist/release-notes.md
+          echo "## SHA256 Checksums" >> dist/release-notes.md
+          echo '```' >> dist/release-notes.md
+          cat checksums.txt >> dist/release-notes.md
+          echo '```' >> dist/release-notes.md
+
+          echo "=== Release notes ==="
+          cat dist/release-notes.md
+
+      - name: Create GitHub Release (draft) & upload assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="${{ env.RELEASE_TAG }}"
+          ASSETS=""
+          for f in dist/release/*; do
+            [ -f "$f" ] && ASSETS="$ASSETS $f"
+          done
+
+          # Create the draft if it does not exist yet; otherwise refresh it.
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists; uploading missing assets."
+            gh release upload "$TAG" $ASSETS --clobber
+            gh release edit "$TAG" --notes-file dist/release-notes.md --draft=true
+          else
+            gh release create "$TAG" \
+              --title "Refactor $TAG" \
+              --notes-file dist/release-notes.md \
+              --draft \
+              $ASSETS
+          fi
+          echo "--- Draft release assets:"
+          gh release view "$TAG" --json assets --jq '.assets[].name' | sort
+
+      - name: Publish draft release (safety gate passed)
+        if: github.event_name != 'workflow_dispatch' || inputs.draft == false
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="${{ env.RELEASE_TAG }}"
+          # Never flip a draft to "published" unless assets are actually attached.
+          COUNT=$(gh release view "$TAG" --json assets --jq '.assets | length')
+          echo "attached assets: $COUNT"
+          if [ "$COUNT" -lt 1 ]; then
+            echo "::error::No assets attached to draft release $TAG — aborting publish." >&2
+            exit 1
+          fi
+          gh release edit "$TAG" --draft=false
+          echo "Published $TAG."
+
+      - name: Verify uploaded assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view "${{ env.RELEASE_TAG }}" --json assets --jq '.assets[].name' | sort
