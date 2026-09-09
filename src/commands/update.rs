@@ -126,9 +126,7 @@ fn get_download_url(version: &str, binary_name: &str) -> Result<String> {
 }
 
 fn get_checksum_url(version: &str) -> String {
-    format!(
-        "https://github.com/{REPO}/releases/download/v{version}/checksums.txt"
-    )
+    format!("https://github.com/{REPO}/releases/download/v{version}/checksums.txt")
 }
 
 fn download_file(url: &str, dest: &std::path::Path) -> Result<()> {
@@ -174,7 +172,11 @@ fn download_text(url: &str) -> Result<String> {
         .map_err(|e| RefactorError::Config(format!("Failed to read checksums: {e}")))
 }
 
-fn verify_checksum(binary_path: &std::path::Path, binary_name: &str, checksums: &str) -> Result<()> {
+fn verify_checksum(
+    binary_path: &std::path::Path,
+    binary_name: &str,
+    checksums: &str,
+) -> Result<()> {
     use std::io::Read;
 
     // Find expected hash
