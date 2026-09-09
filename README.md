@@ -7,6 +7,7 @@ repository.
 
 > **New to refactor?** Read the documentation:
 >
+> - [Installation](doc/install.md) — how to install on any device
 > - [User Guide](doc/guide.md) — how it works, safety features, configuration
 > - [Command Reference](doc/commands.md) — every command, every flag, with output examples
 > - [Real-World Examples](doc/examples.md) — step-by-step workflows for common tasks
