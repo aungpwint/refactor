@@ -308,7 +308,7 @@ jobs:
           echo "" >> dist/release-notes.md
           echo "## SHA256 Checksums" >> dist/release-notes.md
           echo '```' >> dist/release-notes.md
-          cat checksums.txt >> dist/release-notes.md
+          cat dist/release/checksums.txt >> dist/release-notes.md
           echo '```' >> dist/release-notes.md
 
           echo "=== Release notes ==="
