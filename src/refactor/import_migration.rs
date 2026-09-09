@@ -110,9 +110,8 @@ pub fn execute_import_migration(
 fn apply_line_edits(text: &str, changes: &[&ImportChange]) -> String {
     let mut result = String::with_capacity(text.len());
     let mut change_idx = 0;
-    let mut current_line = 1usize;
 
-    for segment in text.split_inclusive('\n') {
+    for (current_line, segment) in (1usize..).zip(text.split_inclusive('\n')) {
         if let Some(change) = changes.get(change_idx) {
             if change.line_number == current_line {
                 let line_without_terminator = segment.trim_end_matches(['\r', '\n']);
@@ -130,7 +129,6 @@ fn apply_line_edits(text: &str, changes: &[&ImportChange]) -> String {
         } else {
             result.push_str(segment);
         }
-        current_line += 1;
     }
 
     result
