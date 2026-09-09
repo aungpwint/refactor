@@ -10,3 +10,4 @@ pub mod rename;
 pub mod replace;
 pub mod scan;
 pub mod unused;
+pub mod update;

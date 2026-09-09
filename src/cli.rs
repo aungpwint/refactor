@@ -93,6 +93,9 @@ pub enum Command {
 
     #[command(about = "Clean empty directories and temporary files")]
     Clean(CleanArgs),
+
+    #[command(about = "Update refactor to the latest version")]
+    Update,
 }
 
 #[derive(Parser)]

@@ -18,6 +18,7 @@ understands imports, paths, and file structure.
 | "What files are never used?" | `unused` | Finds files nobody imports |
 | "Are there duplicate files?" | `duplicates` | Finds files with identical content |
 | "Migrate from old to new paths" | `migrate` | Runs a batch of planned changes |
+| "Update to latest version" | `update` | Downloads and installs the latest release |
 
 ---
 
@@ -25,14 +26,15 @@ understands imports, paths, and file structure.
 
 ### 1. Install
 
-You need [Rust](https://rustup.rs/) installed (version 1.75 or later).
+**Easiest:** Download a pre-built binary from the
+[Releases page](https://github.com/aungpwint/refactor/releases). No
+programming knowledge needed.
+
+**For developers:**
 
 ```bash
-# Clone the repository
 git clone https://github.com/aungpwint/refactor.git
 cd refactor
-
-# Install the tool
 cargo install --path .
 ```
 

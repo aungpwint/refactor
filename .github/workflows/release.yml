@@ -1,0 +1,146 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            artifact: refactor-windows-x64.exe
+            rename: refactor.exe
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            artifact: refactor-macos-x64
+            rename: refactor
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            artifact: refactor-macos-arm64
+            rename: refactor
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            artifact: refactor-linux-x64
+            rename: refactor
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            artifact: refactor-linux-arm64
+            rename: refactor
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install cross-compilation tools (Linux ARM64)
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+          echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+
+      - name: Build release binary
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Rename binary (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          copy target/${{ matrix.target }}/release/refactor.exe ${{ matrix.artifact }}
+
+      - name: Rename binary (Unix)
+        if: matrix.os != 'windows-latest'
+        run: |
+          cp target/${{ matrix.target }}/release/refactor ${{ matrix.artifact }}
+          chmod +x ${{ matrix.artifact }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Create checksums
+        run: |
+          for dir in refactor-*/; do
+            if [ -d "$dir" ]; then
+              cd "$dir"
+              for f in *; do
+                sha256sum "$f" >> ../checksums.txt
+              done
+              cd ..
+            fi
+          done
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            refactor-windows-x64/refactor-windows-x64.exe
+            refactor-macos-x64/refactor-macos-x64
+            refactor-macos-arm64/refactor-macos-arm64
+            refactor-linux-x64/refactor-linux-x64
+            refactor-linux-arm64/refactor-linux-arm64
+            checksums.txt
+          body: |
+            ## Install
+
+            ### Windows
+            Download `refactor-windows-x64.exe` and rename to `refactor.exe`.
+            Add to a folder in your PATH.
+
+            ### macOS (Intel)
+            ```bash
+            curl -L https://github.com/aungpwint/refactor/releases/latest/download/refactor-macos-x64 -o /usr/local/bin/refactor
+            chmod +x /usr/local/bin/refactor
+            ```
+
+            ### macOS (Apple Silicon)
+            ```bash
+            curl -L https://github.com/aungpwint/refactor/releases/latest/download/refactor-macos-arm64 -o /usr/local/bin/refactor
+            chmod +x /usr/local/bin/refactor
+            ```
+
+            ### Linux (x64)
+            ```bash
+            curl -L https://github.com/aungpwint/refactor/releases/latest/download/refactor-linux-x64 -o /usr/local/bin/refactor
+            chmod +x /usr/local/bin/refactor
+            ```
+
+            ### Linux (ARM64)
+            ```bash
+            curl -L https://github.com/aungpwint/refactor/releases/latest/download/refactor-linux-arm64 -o /usr/local/bin/refactor
+            chmod +x /usr/local/bin/refactor
+            ```
+
+            ### Auto-update
+            If you already have refactor installed, run:
+            ```bash
+            refactor update
+            ```
