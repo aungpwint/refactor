@@ -183,20 +183,22 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist/release
-          for dir in dist/binaries/refactor-*/; do
-            for f in "$dir"*; do
-              [ -f "$f" ] && cp "$f" dist/release/
-            done
+          find dist/binaries -type f -not -name '*.yml' -not -name '*.yaml' | while read -r f; do
+            cp "$f" dist/release/
           done
           echo "=== Staged artifacts ==="
           ls -la dist/release/
 
       - name: Generate SHA256 checksums
+        shell: bash
         run: |
           set -euo pipefail
           cd dist/release
-          for f in *; do
-            [ -f "$f" ] && sha256sum "$f" >> checksums.txt
+          touch checksums.txt
+          for f in refactor-*; do
+            if [ -f "$f" ]; then
+              sha256sum "$f" >> checksums.txt
+            fi
           done
           echo "=== checksums.txt ==="
           cat checksums.txt
