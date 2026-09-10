@@ -113,7 +113,7 @@ checksum, and replaces your current installation automatically.
 
 ```bash
 refactor --version
-# Output: refactor 0.1.0
+# Output: refactor 0.2.0
 ```
 
 ---

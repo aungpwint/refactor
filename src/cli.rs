@@ -43,13 +43,21 @@ pub struct GlobalArgs {
     #[arg(short = 'y', long, global = true, help = "Skip confirmation prompts")]
     pub yes: bool,
 
-    #[arg(long, help = "Include only these paths (comma-separated)")]
+    #[arg(
+        long,
+        global = true,
+        help = "Include only these paths (comma-separated)"
+    )]
     pub include: Option<Vec<String>>,
 
-    #[arg(long, help = "Exclude these paths (comma-separated)")]
+    #[arg(long, global = true, help = "Exclude these paths (comma-separated)")]
     pub exclude: Option<Vec<String>>,
 
-    #[arg(long, help = "File extensions to process (comma-separated)")]
+    #[arg(
+        long,
+        global = true,
+        help = "File extensions to process (comma-separated)"
+    )]
     pub extensions: Option<Vec<String>>,
 
     #[arg(long, help = "Number of parallel threads")]
@@ -111,10 +119,7 @@ pub struct McpArgs {
 }
 
 #[derive(Parser)]
-pub struct ScanArgs {
-    #[command(flatten)]
-    pub filters: FilterArgs,
-}
+pub struct ScanArgs {}
 
 #[derive(Parser)]
 pub struct CheckArgs {
@@ -126,19 +131,12 @@ pub struct CheckArgs {
 pub struct ReplaceArgs {
     pub old: String,
     pub new: String,
-
-    #[command(flatten)]
-    pub filters: FilterArgs,
-
     #[arg(long, help = "Use regex patterns")]
     pub regex: bool,
-
     #[arg(long, help = "Case-sensitive matching")]
     pub case_sensitive: bool,
-
     #[arg(long, help = "Match whole words only")]
     pub whole_word: bool,
-
     #[arg(long, help = "Skip git dirty-worktree warning")]
     pub allow_dirty: bool,
 }
@@ -203,31 +201,19 @@ pub enum PathsAction {
 #[derive(Parser)]
 pub struct ReferencesArgs {
     pub path: String,
-
-    #[command(flatten)]
-    pub filters: FilterArgs,
 }
 
 #[derive(Parser)]
-pub struct UnusedArgs {
-    #[command(flatten)]
-    pub filters: FilterArgs,
-}
+pub struct UnusedArgs {}
 
 #[derive(Parser)]
 pub struct DuplicatesArgs {
     #[arg(long, help = "Minimum file size to consider (bytes)")]
     pub min_size: Option<u64>,
-
-    #[command(flatten)]
-    pub filters: FilterArgs,
 }
 
 #[derive(Parser)]
-pub struct NormalizeArgs {
-    #[command(flatten)]
-    pub filters: FilterArgs,
-}
+pub struct NormalizeArgs {}
 
 #[derive(Parser)]
 pub struct MigrateArgs {
@@ -244,18 +230,6 @@ pub struct CleanArgs {
 
     #[arg(long, help = "Remove generated cache files")]
     pub cache: bool,
-}
-
-#[derive(Parser)]
-pub struct FilterArgs {
-    #[arg(long, help = "Include only these paths")]
-    pub include: Option<Vec<String>>,
-
-    #[arg(long, help = "Exclude these paths")]
-    pub exclude: Option<Vec<String>>,
-
-    #[arg(long, help = "File extensions to process")]
-    pub extensions: Option<Vec<String>>,
 }
 
 pub fn parse() -> Cli {

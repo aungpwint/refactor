@@ -1,9 +1,13 @@
 use super::*;
 use std::path::Path;
 
-impl LanguageAnalyzer for JavaScriptAnalyzer {
+impl LanguageAnalyzer for JsAnalyzer {
     fn extensions(&self) -> &[&str] {
-        &["js", "jsx", "mjs", "cjs"]
+        if self.typescript {
+            &["ts", "tsx"]
+        } else {
+            &["js", "jsx", "mjs", "cjs"]
+        }
     }
 
     fn analyze_imports(&self, source: &str, _path: &Path) -> Vec<ImportInfo> {
@@ -14,12 +18,12 @@ impl LanguageAnalyzer for JavaScriptAnalyzer {
                 continue;
             }
             if trimmed.starts_with("import ") || trimmed.starts_with("import{") {
-                if let Some(imp) = parse_js_import(trimmed, i + 1) {
+                if let Some(imp) = parse_js_import(trimmed, i + 1, self.typescript) {
                     imports.push(imp);
                 }
             }
             if trimmed.contains("from '") || trimmed.contains("from \"") {
-                if let Some(imp) = parse_js_from_import(trimmed, i + 1) {
+                if let Some(imp) = parse_from_import(trimmed, i + 1) {
                     if !imports
                         .iter()
                         .any(|existing| existing.line_number == imp.line_number)
@@ -28,7 +32,13 @@ impl LanguageAnalyzer for JavaScriptAnalyzer {
                     }
                 }
             }
-            if trimmed.contains("require('") || trimmed.contains("require(\"") {
+            if self.typescript && trimmed.starts_with("export ") && trimmed.contains(" from ") {
+                if let Some(imp) = parse_reexport(trimmed, i + 1) {
+                    imports.push(imp);
+                }
+            }
+            if !self.typescript && (trimmed.contains("require('") || trimmed.contains("require(\""))
+            {
                 if let Some(imp) = parse_require(trimmed, i + 1) {
                     imports.push(imp);
                 }
@@ -40,6 +50,24 @@ impl LanguageAnalyzer for JavaScriptAnalyzer {
             }
         }
         imports
+    }
+
+    fn analyze_exports(&self, source: &str, _path: &Path) -> Vec<ImportInfo> {
+        if !self.typescript {
+            return Vec::new();
+        }
+        let mut exports = Vec::new();
+        for (i, line) in source.lines().enumerate() {
+            let trimmed = line.trim();
+            if trimmed.starts_with("export ")
+                && (trimmed.contains("from '") || trimmed.contains("from \""))
+            {
+                if let Some(exp) = parse_reexport(trimmed, i + 1) {
+                    exports.push(exp);
+                }
+            }
+        }
+        exports
     }
 
     fn analyze_references(&self, source: &str) -> Vec<ReferenceInfo> {
@@ -78,9 +106,12 @@ impl LanguageAnalyzer for JavaScriptAnalyzer {
     }
 }
 
-fn parse_js_import(line: &str, line_num: usize) -> Option<ImportInfo> {
+fn parse_js_import(line: &str, line_num: usize, typescript: bool) -> Option<ImportInfo> {
     if line.contains(" from ") {
-        return parse_js_from_import(line, line_num);
+        return parse_from_import(line, line_num);
+    }
+    if typescript && (line.starts_with("import('") || line.starts_with("import(\"")) {
+        return parse_dynamic_import(line, line_num);
     }
     if let Some(path) = extract_path_from_statement(line) {
         return Some(ImportInfo {
@@ -93,13 +124,23 @@ fn parse_js_import(line: &str, line_num: usize) -> Option<ImportInfo> {
     None
 }
 
-fn parse_js_from_import(line: &str, line_num: usize) -> Option<ImportInfo> {
+fn parse_from_import(line: &str, line_num: usize) -> Option<ImportInfo> {
     let path = extract_path_from_statement(line)?;
     Some(ImportInfo {
         import_path: path,
         line_number: line_num,
         line_content: line.to_string(),
         import_type: ImportType::Static,
+    })
+}
+
+fn parse_reexport(line: &str, line_num: usize) -> Option<ImportInfo> {
+    let path = extract_path_from_statement(line)?;
+    Some(ImportInfo {
+        import_path: path,
+        line_number: line_num,
+        line_content: line.to_string(),
+        import_type: ImportType::ReExport,
     })
 }
 

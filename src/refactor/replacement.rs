@@ -66,7 +66,7 @@ pub fn execute_replacement(
     _ctx: &RepoContext,
     plan: &ReplacePlan,
     dry_run: bool,
-) -> Result<ExecuteResult> {
+) -> Result<crate::refactor::result::ChangeResult> {
     let mut changed = 0;
     let mut errors = 0;
 
@@ -83,15 +83,10 @@ pub fn execute_replacement(
         }
     }
 
-    Ok(ExecuteResult {
+    Ok(crate::refactor::result::ChangeResult {
         files_changed: changed,
         errors,
     })
-}
-
-pub struct ExecuteResult {
-    pub files_changed: usize,
-    pub errors: usize,
 }
 
 fn build_pattern(

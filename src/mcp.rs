@@ -1,7 +1,7 @@
 use crate::cli::{
-    CheckArgs, CleanArgs, DuplicatesArgs, FilterArgs, ImportMigrateArgs, ImportsAction,
-    ImportsCommand, MigrateArgs, NormalizeArgs, PathsAction, PathsCommand, ReferencesArgs,
-    RenameArgs, ReplaceArgs, ScanArgs, UnusedArgs,
+    CheckArgs, CleanArgs, DuplicatesArgs, ImportMigrateArgs, ImportsAction, ImportsCommand,
+    MigrateArgs, NormalizeArgs, PathsAction, PathsCommand, ReferencesArgs, RenameArgs, ReplaceArgs,
+    ScanArgs, UnusedArgs,
 };
 use crate::commands;
 use crate::config;
@@ -138,9 +138,7 @@ fn handle_tool_call(name: &str, arguments: &Value, default_root: &Path) -> Resul
     match name {
         "scan" => {
             let c = prepare(arguments, default_root, false)?;
-            let args = ScanArgs {
-                filters: filter_args(arguments),
-            };
+            let args = ScanArgs {};
             let code = commands::scan::run(&c.ctx, &c.output, &args)?;
             Ok(tool_result(c, code))
         }
@@ -157,7 +155,6 @@ fn handle_tool_call(name: &str, arguments: &Value, default_root: &Path) -> Resul
             let args = ReplaceArgs {
                 old: req_str(arguments, "old")?,
                 new: req_str(arguments, "new")?,
-                filters: filter_args(arguments),
                 regex: get_bool(arguments, "regex", false),
                 case_sensitive: get_bool(arguments, "case_sensitive", false),
                 whole_word: get_bool(arguments, "whole_word", false),
@@ -191,16 +188,13 @@ fn handle_tool_call(name: &str, arguments: &Value, default_root: &Path) -> Resul
             let c = prepare(arguments, default_root, false)?;
             let args = ReferencesArgs {
                 path: req_str(arguments, "path")?,
-                filters: filter_args(arguments),
             };
             let code = commands::references::run(&c.ctx, &c.output, &args)?;
             Ok(tool_result(c, code))
         }
         "unused" => {
             let c = prepare(arguments, default_root, false)?;
-            let args = UnusedArgs {
-                filters: filter_args(arguments),
-            };
+            let args = UnusedArgs {};
             let code = commands::unused::run(&c.ctx, &c.output, &args)?;
             Ok(tool_result(c, code))
         }
@@ -208,16 +202,13 @@ fn handle_tool_call(name: &str, arguments: &Value, default_root: &Path) -> Resul
             let c = prepare(arguments, default_root, false)?;
             let args = DuplicatesArgs {
                 min_size: get_opt_u64(arguments, "min_size"),
-                filters: filter_args(arguments),
             };
             let code = commands::duplicates::run(&c.ctx, &c.output, &args)?;
             Ok(tool_result(c, code))
         }
         "normalize" => {
             let c = prepare(arguments, default_root, false)?;
-            let args = NormalizeArgs {
-                filters: filter_args(arguments),
-            };
+            let args = NormalizeArgs {};
             let code = commands::normalize::run(&c.ctx, &c.output, &args)?;
             Ok(tool_result(c, code))
         }
@@ -250,9 +241,7 @@ fn handle_tool_call(name: &str, arguments: &Value, default_root: &Path) -> Resul
 fn imports_command(arguments: &Value) -> Result<ImportsCommand> {
     let cmd = match req_str(arguments, "action")?.as_str() {
         "scan" => ImportsCommand {
-            action: ImportsAction::Scan(ScanArgs {
-                filters: filter_args(arguments),
-            }),
+            action: ImportsAction::Scan(ScanArgs {}),
         },
         "check" => ImportsCommand {
             action: ImportsAction::Check(CheckArgs {
@@ -266,14 +255,10 @@ fn imports_command(arguments: &Value) -> Result<ImportsCommand> {
             }),
         },
         "normalize" => ImportsCommand {
-            action: ImportsAction::Normalize(NormalizeArgs {
-                filters: filter_args(arguments),
-            }),
+            action: ImportsAction::Normalize(NormalizeArgs {}),
         },
         "unused" => ImportsCommand {
-            action: ImportsAction::Unused(UnusedArgs {
-                filters: filter_args(arguments),
-            }),
+            action: ImportsAction::Unused(UnusedArgs {}),
         },
         other => {
             return Err(RefactorError::Validation(format!(
@@ -287,9 +272,7 @@ fn imports_command(arguments: &Value) -> Result<ImportsCommand> {
 fn paths_command(arguments: &Value) -> Result<PathsCommand> {
     let cmd = match req_str(arguments, "action")?.as_str() {
         "scan" => PathsCommand {
-            action: PathsAction::Scan(ScanArgs {
-                filters: filter_args(arguments),
-            }),
+            action: PathsAction::Scan(ScanArgs {}),
         },
         "check" => PathsCommand {
             action: PathsAction::Check(CheckArgs {
@@ -303,9 +286,7 @@ fn paths_command(arguments: &Value) -> Result<PathsCommand> {
             }),
         },
         "normalize" => PathsCommand {
-            action: PathsAction::Normalize(NormalizeArgs {
-                filters: filter_args(arguments),
-            }),
+            action: PathsAction::Normalize(NormalizeArgs {}),
         },
         other => {
             return Err(RefactorError::Validation(format!(
@@ -326,6 +307,9 @@ struct ToolContext {
 fn prepare(arguments: &Value, default_root: &Path, apply: bool) -> Result<ToolContext> {
     let root = resolve_root(arguments, default_root)?;
     let mut config = config::load(&root)?;
+    if let Some(include) = string_array(arguments, "include") {
+        config.scan.include = include;
+    }
     if let Some(extensions) = string_array(arguments, "extensions") {
         config.scan.extensions = extensions;
     }
@@ -413,14 +397,6 @@ fn string_array(arguments: &Value, key: &str) -> Option<Vec<String>> {
             .map(str::to_string)
             .collect()
     })
-}
-
-fn filter_args(arguments: &Value) -> FilterArgs {
-    FilterArgs {
-        include: string_array(arguments, "include"),
-        exclude: string_array(arguments, "exclude"),
-        extensions: string_array(arguments, "extensions"),
-    }
 }
 
 fn tools() -> Value {

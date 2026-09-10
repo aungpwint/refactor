@@ -41,6 +41,8 @@ pub struct ScanConfig {
     pub extensions: Vec<String>,
     #[serde(default = "default_excludes")]
     pub exclude: Vec<String>,
+    #[serde(default)]
+    pub include: Vec<String>,
 }
 
 impl Default for ScanConfig {
@@ -48,6 +50,7 @@ impl Default for ScanConfig {
         Self {
             extensions: default_extensions(),
             exclude: default_excludes(),
+            include: Vec::new(),
         }
     }
 }
@@ -92,6 +95,9 @@ fn load_toml_config(root: &Path) -> Result<Config> {
 pub fn apply_cli_args(config: &mut Config, args: &GlobalArgs) {
     if let Some(ref exts) = args.extensions {
         config.scan.extensions = exts.clone();
+    }
+    if let Some(ref includes) = args.include {
+        config.scan.include = includes.clone();
     }
     if let Some(ref excludes) = args.exclude {
         config.scan.exclude.extend(excludes.iter().cloned());

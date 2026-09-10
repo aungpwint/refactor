@@ -8,6 +8,7 @@ pub struct RepoContext {
     pub is_git: bool,
     pub extensions: Vec<String>,
     pub exclude_dirs: Vec<String>,
+    pub include_dirs: Vec<String>,
     thread_pool_initialized: bool,
 }
 
@@ -29,6 +30,7 @@ impl RepoContext {
         let is_git = root.join(".git").exists();
         let extensions = config.scan.extensions.clone();
         let exclude_dirs = config.scan.exclude.clone();
+        let include_dirs = config.scan.include.clone();
 
         Ok(Self {
             root,
@@ -36,6 +38,7 @@ impl RepoContext {
             is_git,
             extensions,
             exclude_dirs,
+            include_dirs,
             thread_pool_initialized: false,
         })
     }

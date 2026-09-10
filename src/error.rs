@@ -34,9 +34,6 @@ pub enum RefactorError {
 
     #[error("Regex error: {0}")]
     Regex(#[from] regex::Error),
-
-    #[error("Glob error: {0}")]
-    Glob(#[from] glob::GlobError),
 }
 
 pub type Result<T> = std::result::Result<T, RefactorError>;
@@ -54,7 +51,6 @@ impl RefactorError {
             RefactorError::Json(_) => 3,
             RefactorError::Toml(_) => 3,
             RefactorError::Regex(_) => 2,
-            RefactorError::Glob(_) => 2,
         }
     }
 }

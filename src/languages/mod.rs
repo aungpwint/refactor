@@ -2,7 +2,6 @@ pub mod generic;
 pub mod javascript;
 pub mod json;
 pub mod php;
-pub mod typescript;
 
 use std::path::Path;
 
@@ -64,8 +63,10 @@ pub trait LanguageAnalyzer {
     }
 }
 
-struct TypeScriptAnalyzer;
-struct JavaScriptAnalyzer;
+pub struct JsAnalyzer {
+    pub typescript: bool,
+}
+
 struct PhpAnalyzer;
 struct JsonAnalyzer;
 struct GenericAnalyzer;
@@ -77,8 +78,8 @@ pub fn detect_language(path: &Path) -> Box<dyn LanguageAnalyzer> {
         .unwrap_or("")
         .to_lowercase();
     match ext.as_str() {
-        "ts" | "tsx" => Box::new(TypeScriptAnalyzer),
-        "js" | "jsx" | "mjs" | "cjs" => Box::new(JavaScriptAnalyzer),
+        "ts" | "tsx" => Box::new(JsAnalyzer { typescript: true }),
+        "js" | "jsx" | "mjs" | "cjs" => Box::new(JsAnalyzer { typescript: false }),
         "php" => Box::new(PhpAnalyzer),
         "json" => Box::new(JsonAnalyzer),
         _ => Box::new(GenericAnalyzer),

@@ -196,7 +196,7 @@ pub fn execute_rename(
     _ctx: &RepoContext,
     plan: &RenamePlan,
     dry_run: bool,
-) -> Result<RenameResult> {
+) -> Result<crate::refactor::result::ChangeResult> {
     let mut files_changed = 0;
     let mut errors = 0;
 
@@ -226,15 +226,10 @@ pub fn execute_rename(
         files_changed = plan.affected_files.len();
     }
 
-    Ok(RenameResult {
+    Ok(crate::refactor::result::ChangeResult {
         files_changed,
         errors,
     })
-}
-
-pub struct RenameResult {
-    pub files_changed: usize,
-    pub errors: usize,
 }
 
 fn count_references(content: &str, pattern: &str) -> usize {
