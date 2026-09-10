@@ -1,11 +1,17 @@
 use crate::cli::RenameArgs;
 use crate::context::RepoContext;
 use crate::error::Result;
+use crate::exec::ExecOptions;
 use crate::output::Output;
 use crate::refactor::rename;
 
-pub fn run(ctx: &RepoContext, output: &Output, args: &RenameArgs) -> Result<i32> {
-    let dry_run = std::env::args().any(|a| a == "--dry-run");
+pub fn run(
+    ctx: &RepoContext,
+    output: &Output,
+    args: &RenameArgs,
+    opts: &ExecOptions,
+) -> Result<i32> {
+    let dry_run = opts.dry_run;
 
     output.heading("Rename");
     output.progress("Planning rename");
@@ -18,7 +24,7 @@ pub fn run(ctx: &RepoContext, output: &Output, args: &RenameArgs) -> Result<i32>
         return Ok(0);
     }
 
-    if !std::env::args().any(|a| a == "--yes") && !dry_run {
+    if !opts.confirm && !dry_run {
         output.warn("Rename requires --yes to confirm (or use --dry-run)");
         return Ok(2);
     }

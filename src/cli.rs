@@ -94,8 +94,20 @@ pub enum Command {
     #[command(about = "Clean empty directories and temporary files")]
     Clean(CleanArgs),
 
+    #[command(about = "Run as a Model Context Protocol (MCP) server over stdio")]
+    Mcp(McpArgs),
+
     #[command(about = "Update refactor to the latest version")]
     Update,
+}
+
+#[derive(Parser)]
+pub struct McpArgs {
+    #[arg(
+        long,
+        help = "Default repository root served by the MCP server (default: current directory)"
+    )]
+    pub root: Option<PathBuf>,
 }
 
 #[derive(Parser)]

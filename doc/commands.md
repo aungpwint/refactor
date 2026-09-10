@@ -554,3 +554,70 @@ Clean
 
   âœ“ Cleaned 9 items
 ```
+
+---
+
+## `mcp` — Model Context Protocol server
+
+**What it does:** Runs `refactor` as an MCP server over stdio so AI agents
+(opencode, Claude Code, and other MCP clients) can call every command as a
+tool.
+
+**Type:** Server (reads newline-delimited JSON-RPC 2.0 from stdin, writes
+responses to stdout; diagnostic logs go to stderr)
+
+```bash
+refactor mcp
+refactor mcp --root /path/to/repo
+```
+
+**Flags:**
+
+| Flag | Description |
+|------|-------------|
+| `--root <PATH>` | Default repository root served by the server |
+
+**MCP client configuration (opencode `opencode.jsonc`):**
+
+```jsonc
+{
+  "mcp": {
+    "refactor": {
+      "type": "local",
+      "command": ["refactor", "mcp", "--root", "/path/to/repo"],
+      "enabled": true
+    }
+  }
+}
+```
+
+For Claude Code:
+
+```bash
+claude mcp add refactor -- refactor mcp --root /path/to/repo
+```
+
+**Tools exposed** (one per CLI command):
+
+| Tool | Mutating? | Key arguments |
+|------|-----------|---------------|
+| `scan` | no | `root` |
+| `check` | no | `root`, `strict` |
+| `replace` | yes* | `old`, `new`, `regex`, `case_sensitive`, `whole_word`, `allow_dirty`, `apply` |
+| `rename` | yes* | `old`, `new`, `apply` |
+| `imports` | migrate* | `action` (`scan`\|`check`\|`migrate`\|`normalize`\|`unused`), `old`, `new`, `apply` |
+| `paths` | migrate* | `action` (`scan`\|`check`\|`migrate`\|`normalize`), `old`, `new`, `apply` |
+| `references` | no | `path` |
+| `unused` | no | — |
+| `duplicates` | no | `min_size` |
+| `normalize` | no | — |
+| `migrate` | yes* | `plan`, `apply` |
+| `clean` | yes* | `temp_files`, `cache`, `empty_dirs`, `apply` |
+
+**Safety:** Every mutating tool defaults to a **dry run**. Pass `apply: true`
+in the tool arguments to write changes to disk. Read-only tools never modify
+files. Each tool accepts an optional `root` to scope the operation.
+
+**Supported MCP methods:** `initialize`, `ping`, `tools/list`, `tools/call`,
+plus empty `resources/list`, `resources/templates/list`, and `prompts/list`.
+Unknown methods receive a JSON-RPC `-32601 Method not found` error.

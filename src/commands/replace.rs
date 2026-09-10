@@ -1,11 +1,17 @@
 use crate::cli::ReplaceArgs;
 use crate::context::RepoContext;
 use crate::error::Result;
+use crate::exec::ExecOptions;
 use crate::output::Output;
 use crate::refactor::replacement;
 
-pub fn run(ctx: &RepoContext, output: &Output, args: &ReplaceArgs) -> Result<i32> {
-    let dry_run = std::env::args().any(|a| a == "--dry-run");
+pub fn run(
+    ctx: &RepoContext,
+    output: &Output,
+    args: &ReplaceArgs,
+    opts: &ExecOptions,
+) -> Result<i32> {
+    let dry_run = opts.dry_run;
 
     output.heading("Replace");
     output.info(&format!("Old: \"{}\"", args.old));

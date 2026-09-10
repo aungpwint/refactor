@@ -1,11 +1,17 @@
 use crate::cli::MigrateArgs;
 use crate::context::RepoContext;
 use crate::error::{RefactorError, Result};
+use crate::exec::ExecOptions;
 use crate::output::Output;
 use crate::refactor::planner;
 
-pub fn run(ctx: &RepoContext, output: &Output, args: &MigrateArgs) -> Result<i32> {
-    let dry_run = std::env::args().any(|a| a == "--dry-run");
+pub fn run(
+    ctx: &RepoContext,
+    output: &Output,
+    args: &MigrateArgs,
+    opts: &ExecOptions,
+) -> Result<i32> {
+    let dry_run = opts.dry_run;
 
     output.heading("Migration");
 

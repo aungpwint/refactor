@@ -1,13 +1,19 @@
 use crate::cli::{PathsAction, PathsCommand};
 use crate::context::RepoContext;
 use crate::error::Result;
+use crate::exec::ExecOptions;
 use crate::output::Output;
 
-pub fn run(ctx: &RepoContext, output: &Output, args: &PathsCommand) -> Result<i32> {
+pub fn run(
+    ctx: &RepoContext,
+    output: &Output,
+    args: &PathsCommand,
+    opts: &ExecOptions,
+) -> Result<i32> {
     match &args.action {
         PathsAction::Scan(_) => scan(ctx, output),
         PathsAction::Check(_) => check(ctx, output),
-        PathsAction::Migrate(args) => migrate(ctx, output, &args.old, &args.new),
+        PathsAction::Migrate(args) => migrate(ctx, output, &args.old, &args.new, opts),
         PathsAction::Normalize(_) => normalize(ctx, output),
     }
 }
@@ -65,8 +71,14 @@ fn check(ctx: &RepoContext, output: &Output) -> Result<i32> {
     Ok(if total_errors > 0 { 1 } else { 0 })
 }
 
-fn migrate(ctx: &RepoContext, output: &Output, old: &str, new: &str) -> Result<i32> {
-    let dry_run = std::env::args().any(|a| a == "--dry-run");
+fn migrate(
+    ctx: &RepoContext,
+    output: &Output,
+    old: &str,
+    new: &str,
+    opts: &ExecOptions,
+) -> Result<i32> {
+    let dry_run = opts.dry_run;
 
     output.heading("Path Migration");
     output.info(&format!("Old: \"{old}\""));

@@ -27,6 +27,9 @@ repository.
 - **normalize** — Normalize import/path styles.
 - **migrate** — Execute a TOML/JSON migration plan.
 - **clean** — Remove temp files, cache files, and empty directories.
+- **mcp** — Run all of the above as a Model Context Protocol server over
+  stdio, so AI agents (opencode, Claude Code, …) can call every command as a
+  tool. See [the MCP command reference](doc/commands.md#mcp--model-context-protocol-server).
 
 ## Safety by default
 
@@ -57,6 +60,24 @@ refactor --root /path/to/repo replace --dry-run "old/pattern" "new/pattern"
 refactor --root /path/to/repo replace --yes "admin/resource-kit" "components/resource-kit"
 refactor --root /path/to/repo rename --yes "src/old.ts" "src/new.ts"
 refactor --root /path/to/repo --json scan
+refactor mcp --root /path/to/repo
+```
+
+### AI integration (MCP)
+
+`refactor mcp` serves every command as an MCP tool over stdio. Each tool
+accepts an optional `root`; mutating tools (`replace`, `rename`, `imports`
+migrate, `paths` migrate, `migrate`, `clean`) default to a safe dry run and
+write only when you pass `apply: true`.
+
+opencode config:
+
+```jsonc
+{
+  "mcp": {
+    "refactor": { "type": "local", "command": ["refactor", "mcp", "--root", "/path/to/repo"], "enabled": true }
+  }
+}
 ```
 
 ### Global options

@@ -1,14 +1,20 @@
 use crate::cli::{ImportsAction, ImportsCommand};
 use crate::context::RepoContext;
 use crate::error::Result;
+use crate::exec::ExecOptions;
 use crate::output::Output;
 use crate::scanner::content_scanner::scan_imports;
 
-pub fn run(ctx: &RepoContext, output: &Output, args: &ImportsCommand) -> Result<i32> {
+pub fn run(
+    ctx: &RepoContext,
+    output: &Output,
+    args: &ImportsCommand,
+    opts: &ExecOptions,
+) -> Result<i32> {
     match &args.action {
         ImportsAction::Scan(_) => scan(ctx, output),
         ImportsAction::Check(_) => check(ctx, output),
-        ImportsAction::Migrate(args) => migrate(ctx, output, &args.old, &args.new),
+        ImportsAction::Migrate(args) => migrate(ctx, output, &args.old, &args.new, opts),
         ImportsAction::Normalize(_) => normalize(ctx, output),
         ImportsAction::Unused(_) => unused(ctx, output),
     }
@@ -81,8 +87,14 @@ fn check(ctx: &RepoContext, output: &Output) -> Result<i32> {
     Ok(if issues.is_empty() { 0 } else { 1 })
 }
 
-fn migrate(ctx: &RepoContext, output: &Output, old: &str, new: &str) -> Result<i32> {
-    let dry_run = std::env::args().any(|a| a == "--dry-run");
+fn migrate(
+    ctx: &RepoContext,
+    output: &Output,
+    old: &str,
+    new: &str,
+    opts: &ExecOptions,
+) -> Result<i32> {
+    let dry_run = opts.dry_run;
 
     output.heading("Import Migration");
     output.info(&format!("Old: \"{old}\""));
