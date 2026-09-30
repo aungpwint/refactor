@@ -46,7 +46,7 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     --allow-dirty)
-      ALLOW_DIRRY=true
+      ALLOW_DIRTY=true
       shift
       ;;
     --skip-checks)
@@ -80,7 +80,7 @@ cd "$ROOT_DIR"
 git rev-parse --git-dir >/dev/null 2>&1 || fail "Not inside a Git repository."
 
 # Check clean tree
-if ! $ALLOW_DIRRY; then
+if ! $ALLOW_DIRTY; then
   STATUS=$(git status --porcelain)
   if [ -n "$STATUS" ]; then
     fail "Working tree is not clean. Commit or stash first, or re-run with --allow-dirty."
