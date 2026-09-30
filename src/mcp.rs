@@ -1,7 +1,7 @@
 use crate::cli::{
     CheckArgs, CleanArgs, DuplicatesArgs, ImportMigrateArgs, ImportsAction, ImportsCommand,
     MigrateArgs, NormalizeArgs, PathsAction, PathsCommand, ReferencesArgs, RenameArgs, ReplaceArgs,
-    ScanArgs, UnusedArgs,
+    ScanArgs, StripCommentsArgs, UnusedArgs,
 };
 use crate::commands;
 use crate::config;
@@ -234,6 +234,19 @@ fn handle_tool_call(name: &str, arguments: &Value, default_root: &Path) -> Resul
             let code = commands::clean::run(&c.ctx, &c.output, &args, &c.opts)?;
             Ok(tool_result(c, code))
         }
+        "strip-comments" => {
+            let c = prepare(arguments, default_root, get_bool(arguments, "apply", false))?;
+            let args = StripCommentsArgs {
+                lang: comma_list(arguments, "lang").unwrap_or_else(|| vec!["all".to_string()]),
+                generated: get_bool(arguments, "generated", false),
+                keep_blank_lines: get_bool(arguments, "keep_blank_lines", false),
+                strip_directives: get_bool(arguments, "strip_directives", false),
+                no_format: get_bool(arguments, "no_format", false),
+                allow_dirty: get_bool(arguments, "allow_dirty", false),
+            };
+            let code = commands::strip_comments::run(&c.ctx, &c.output, &args, &c.opts)?;
+            Ok(tool_result(c, code))
+        }
         other => Err(RefactorError::Validation(format!("Unknown tool '{other}'"))),
     }
 }
@@ -399,6 +412,22 @@ fn string_array(arguments: &Value, key: &str) -> Option<Vec<String>> {
     })
 }
 
+/// comma_list reads a list that may arrive either as an array or as one
+/// comma-separated string, so a caller can mirror the CLI's `--lang go,rust`
+/// without having to know which shape this server expects.
+fn comma_list(arguments: &Value, key: &str) -> Option<Vec<String>> {
+    if let Some(items) = string_array(arguments, key) {
+        return Some(items);
+    }
+    arguments.get(key).and_then(Value::as_str).map(|raw| {
+        raw.split(',')
+            .map(str::trim)
+            .filter(|part| !part.is_empty())
+            .map(str::to_string)
+            .collect()
+    })
+}
+
 fn tools() -> Value {
     json!([
         tool_def("scan", "Inventory repository files and directories by extension. Read-only.", schema(&[
@@ -484,6 +513,16 @@ fn tools() -> Value {
             ("temp_files", bool_prop("Remove *.tmp, *.bak, .~* temp files")),
             ("cache", bool_prop("Remove cache directories (.cache, __pycache__, .pytest_cache)")),
             ("empty_dirs", bool_prop("Remove empty directories")),
+            ("apply", apply_prop()),
+            ("root", root_prop()),
+        ], &[])),
+        tool_def("strip-comments", "Remove comments from source files (go, rust, js/ts/jsx/tsx, sql, graphql). Functional directives and generated files are kept by default. Defaults to a dry-run preview; pass apply=true to write changes.", schema(&[
+            ("lang", array_prop("Languages to process: go, rust, js, jsx, ts, tsx, react, web, sql, graphql, all (default all)")),
+            ("generated", bool_prop("Also rewrite generated files (files with a DO NOT EDIT banner)")),
+            ("keep_blank_lines", bool_prop("Keep the blank line a removed comment leaves behind")),
+            ("strip_directives", bool_prop("Delete tool directives too (//go:build, //nolint, // @ts-ignore, // rustfmt::skip, -- +migrate down)")),
+            ("no_format", bool_prop("Do not pipe output through the language formatter (gofmt, rustfmt, prettier)")),
+            ("allow_dirty", bool_prop("Skip the git dirty-worktree warning")),
             ("apply", apply_prop()),
             ("root", root_prop()),
         ], &[])),

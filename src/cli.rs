@@ -75,6 +75,9 @@ pub enum Command {
     #[command(about = "Replace strings across source files")]
     Replace(ReplaceArgs),
 
+    #[command(about = "Remove source-code comments while keeping toolchain directives")]
+    StripComments(StripCommentsArgs),
+
     #[command(about = "Rename files or directories")]
     Rename(RenameArgs),
 
@@ -137,6 +140,41 @@ pub struct ReplaceArgs {
     pub case_sensitive: bool,
     #[arg(long, help = "Match whole words only")]
     pub whole_word: bool,
+    #[arg(long, help = "Skip git dirty-worktree warning")]
+    pub allow_dirty: bool,
+}
+
+#[derive(Parser)]
+pub struct StripCommentsArgs {
+    #[arg(
+        long,
+        value_delimiter = ',',
+        default_value = "all",
+        help = "Languages to process: go, rust, js, jsx, ts, tsx, react, web, sql, graphql, all"
+    )]
+    pub lang: Vec<String>,
+
+    #[arg(
+        long,
+        help = "Also rewrite generated files (files with a DO NOT EDIT banner)"
+    )]
+    pub generated: bool,
+
+    #[arg(long, help = "Keep the blank line a removed comment leaves behind")]
+    pub keep_blank_lines: bool,
+
+    #[arg(
+        long,
+        help = "Delete tool directives too (//go:build, //nolint, // @ts-ignore, // rustfmt::skip)"
+    )]
+    pub strip_directives: bool,
+
+    #[arg(
+        long,
+        help = "Do not pipe output through the language formatter (gofmt, rustfmt, prettier)"
+    )]
+    pub no_format: bool,
+
     #[arg(long, help = "Skip git dirty-worktree warning")]
     pub allow_dirty: bool,
 }

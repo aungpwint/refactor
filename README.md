@@ -27,6 +27,10 @@ repository.
 - **normalize** — Normalize import/path styles.
 - **migrate** — Execute a TOML/JSON migration plan.
 - **clean** — Remove temp files, cache files, and empty directories.
+- **strip-comments** — Remove comments from Go, Rust, JS/TS/JSX/TSX, SQL, and
+  GraphQL sources with a per-language lexer, so `//`, `/* */`, `--`, and `#`
+  are only removed outside strings, raw strings, regex literals, and
+  dollar-quoted bodies.
 - **mcp** — Run all of the above as a Model Context Protocol server over
   stdio, so AI agents (opencode, Claude Code, …) can call every command as a
   tool. See [the MCP command reference](doc/commands.md#mcp--model-context-protocol-server).
@@ -44,6 +48,12 @@ repository.
   worktree before mutating commands.
 - **Atomic writes**: files are written via a temp-file + rename to avoid
   partial writes.
+- **Directives are not comments**: `strip-comments` leaves functional markers
+  alone by default — `//go:build`, `//go:embed`, `//go:generate`, `//nolint`,
+  `// rustfmt::skip`, `/// <reference>`, `// @ts-ignore`, `eslint-disable`,
+  `prettier-ignore`, source-map pragmas, and SQL migration markers such as
+  `-- +migrate down`. Pass `--strip-directives` to remove those too.
+- **Generated files are skipped** unless you pass `--generated`.
 
 ## Install
 
@@ -60,15 +70,49 @@ refactor --root /path/to/repo replace --dry-run "old/pattern" "new/pattern"
 refactor --root /path/to/repo replace --yes "admin/resource-kit" "components/resource-kit"
 refactor --root /path/to/repo rename --yes "src/old.ts" "src/new.ts"
 refactor --root /path/to/repo --json scan
+refactor --root /path/to/repo strip-comments --dry-run
+refactor --root /path/to/repo strip-comments --lang ts,tsx
+refactor --root /path/to/repo strip-comments --lang sql,graphql --allow-dirty
 refactor mcp --root /path/to/repo
 ```
+
+### strip-comments
+
+Removes comments from source files, narrowing the work with `--lang`:
+
+| Value | Files |
+|-------|-------|
+| `go` | `.go` |
+| `rust` | `.rs` |
+| `js`, `jsx` | `.js`, `.jsx`, `.mjs`, `.cjs` |
+| `ts`, `tsx` | `.ts`, `.tsx`, `.mts`, `.cts` |
+| `react`, `web` | the whole JS/TS family |
+| `sql` | `.sql` |
+| `graphql` | `.graphql`, `.gql`, `.graphqls` |
+| `all` (default) | every language above |
+
+Each language gets its own lexer rather than a regex, so comment-looking text
+inside a string, raw string, regex literal, or SQL dollar-quoted body survives:
+
+```sql
+-- this goes
+SELECT 'https://example.com' AS url, $$ -- this is a body comment, not the file's $$ AS q;
+```
+
+GraphQL `"description"` blocks are schema rather than commentary and are always
+kept. Output is piped through the language formatter when one is available
+(`gofmt`, `rustfmt`, `prettier`, then `biome`); a missing formatter is reported
+but is not an error, and `--no-format` turns formatting off.
+
+Run it twice and the second pass reports nothing left to strip, so it is safe to
+re-run over an already-processed tree.
 
 ### AI integration (MCP)
 
 `refactor mcp` serves every command as an MCP tool over stdio. Each tool
 accepts an optional `root`; mutating tools (`replace`, `rename`, `imports`
-migrate, `paths` migrate, `migrate`, `clean`) default to a safe dry run and
-write only when you pass `apply: true`.
+migrate, `paths` migrate, `migrate`, `clean`, `strip-comments`) default to a
+safe dry run and write only when you pass `apply: true`.
 
 opencode config:
 

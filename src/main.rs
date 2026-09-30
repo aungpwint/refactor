@@ -64,6 +64,9 @@ fn main() {
         cli::Command::Normalize(args) => commands::normalize::run(&ctx, &output, &args),
         cli::Command::Migrate(args) => commands::migrate::run(&ctx, &output, &args, &opts),
         cli::Command::Clean(args) => commands::clean::run(&ctx, &output, &args, &opts),
+        cli::Command::StripComments(args) => {
+            commands::strip_comments::run(&ctx, &output, &args, &opts)
+        }
         cli::Command::Update => commands::update::run(&ctx, &output),
         cli::Command::Mcp(_) => unreachable!("mcp handled above"),
     };

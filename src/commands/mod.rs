@@ -9,5 +9,6 @@ pub mod references;
 pub mod rename;
 pub mod replace;
 pub mod scan;
+pub mod strip_comments;
 pub mod unused;
 pub mod update;

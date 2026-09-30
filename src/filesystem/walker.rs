@@ -9,15 +9,23 @@ pub struct FileEntry {
 }
 
 pub fn collect_files(ctx: &RepoContext) -> Vec<FileEntry> {
+    collect_files_with_extensions(ctx, &ctx.extensions)
+}
+
+/// collect_files_with_extensions walks the repository honouring the same
+/// include, exclude and .gitignore rules as `collect_files`, but filtering on an
+/// extension list the caller chose. A command whose languages decide which files
+/// it can read needs this: the configured extension list is a frontend default
+/// and would hide every Go file in a backend repository.
+pub fn collect_files_with_extensions(ctx: &RepoContext, extensions: &[String]) -> Vec<FileEntry> {
     let root = ctx.root.clone();
     let exclude_dirs = ctx.exclude_dirs.clone();
     let include_dirs = ctx.include_dirs.clone();
-    let exts = ctx.extensions.clone();
 
     let mut builder = WalkBuilder::new(&root);
     builder.hidden(false).git_ignore(true).require_git(false);
 
-    let ext_lower: Vec<String> = exts.iter().map(|e| e.to_lowercase()).collect();
+    let ext_lower: Vec<String> = extensions.iter().map(|e| e.to_lowercase()).collect();
 
     builder
         .build()

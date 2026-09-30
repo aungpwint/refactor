@@ -557,7 +557,97 @@ Clean
 
 ---
 
-## `mcp` � Model Context Protocol server
+## `strip-comments`
+
+**What it does:** Removes comments from source files using a per-language lexer
+rather than a regex, so comment-looking text inside a string, raw string, regex
+literal, or SQL dollar-quoted body is left alone.
+
+**Type:** Mutating (rewrites files)
+
+```bash
+refactor strip-comments --dry-run
+refactor strip-comments --lang ts,tsx
+refactor strip-comments --lang sql,graphql --allow-dirty
+refactor strip-comments --strip-directives
+```
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--lang` | `all` | Comma-separated languages (see table below) |
+| `--generated` | off | Also rewrite files carrying a `DO NOT EDIT` banner |
+| `--keep-blank-lines` | off | Keep the blank line a removed comment leaves behind |
+| `--strip-directives` | off | Remove functional directives too (see below) |
+| `--no-format` | off | Skip the language formatter |
+| `--allow-dirty` | off | Skip the git dirty-worktree warning |
+
+**Languages:**
+
+| Value | Files |
+|-------|-------|
+| `go` | `.go` |
+| `rust` | `.rs` |
+| `js`, `jsx` | `.js`, `.jsx`, `.mjs`, `.cjs` |
+| `ts`, `tsx` | `.ts`, `.tsx`, `.mts`, `.cts` |
+| `react`, `web` | the whole JS/TS family |
+| `sql` | `.sql` |
+| `graphql` | `.graphql`, `.gql`, `.graphqls` |
+| `all` | every language above |
+
+**What is kept by default**
+
+These are functional, not commentary, so removing them breaks the build:
+
+| Language | Kept |
+|----------|------|
+| Go | `//go:build`, `//go:embed`, `//go:generate`, `//nolint` |
+| Rust | `// rustfmt::skip` |
+| JS/TS | `/// <reference …>`, `// @ts-ignore`, `// @ts-expect-error`, `// @ts-check`, `// eslint-*`, `// prettier-ignore`, `// biome-ignore`, `//#region`, source-map pragmas |
+| SQL | `-- +migrate …`, `-- +goose …` (e.g. the `-- +migrate down` marker a migration runner splits on) |
+| GraphQL | `"""description"""` blocks — these are schema, not comments |
+
+`--strip-directives` removes the whole set.
+
+**Formatters:** Output is piped through the first formatter found on `PATH` —
+`gofmt` for Go, `rustfmt` for Rust, `prettier` then `biome` for JS/TS. SQL and
+GraphQL have no formatter. A missing formatter is reported but is not an error,
+and `--no-format` disables the step. A formatter that fails **aborts that file
+rather than writing it unformatted**, so a formatting failure never silently
+degrades the output.
+
+**Idempotency:** A second run over an already-processed tree finds nothing and
+exits without writing.
+
+**Example output:**
+
+```
+Strip comments
+──────────────
+  Languages: sql, graphql
+  Extensions: sql, gql, graphql, graphqls
+  Kept: -- +migrate, -- +goose
+  Kept: GraphQL descriptions, which are schema rather than commentary
+
+Plan
+────
+  Files scanned: 237
+  Files affected: 29
+  Comments: 1582
+
+    graphql: 11 file(s)
+    sql: 18 file(s)
+
+  Formatter: none for sql (there is no SQL formatter)
+
+  ✓ 29 files updated
+  18 generated file(s) skipped; use --generated to include them
+```
+
+---
+
+## `mcp` � Model Context Protocol server
 
 **What it does:** Runs `refactor` as an MCP server over stdio so AI agents
 (opencode, Claude Code, and other MCP clients) can call every command as a
@@ -608,11 +698,12 @@ claude mcp add refactor -- refactor mcp --root /path/to/repo
 | `imports` | migrate* | `action` (`scan`\|`check`\|`migrate`\|`normalize`\|`unused`), `old`, `new`, `apply` |
 | `paths` | migrate* | `action` (`scan`\|`check`\|`migrate`\|`normalize`), `old`, `new`, `apply` |
 | `references` | no | `path` |
-| `unused` | no | � |
+| `unused` | no | � |
 | `duplicates` | no | `min_size` |
-| `normalize` | no | � |
+| `normalize` | no | � |
 | `migrate` | yes* | `plan`, `apply` |
 | `clean` | yes* | `temp_files`, `cache`, `empty_dirs`, `apply` |
+| `strip-comments` | yes* | `lang` (array or comma-separated string), `generated`, `keep_blank_lines`, `strip_directives`, `no_format`, `allow_dirty`, `apply` |
 
 **Safety:** Every mutating tool defaults to a **dry run**. Pass `apply: true`
 in the tool arguments to write changes to disk. Read-only tools never modify
